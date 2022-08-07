@@ -102,6 +102,8 @@ def detect():
     else:
         print(opt.source)
         cap = cv2.VideoCapture(opt.source, cv2.CAP_GSTREAMER)
+    #img = torch.zeros((1, 3, imgsz, imgsz))
+    im0 = []
     if cap.isOpened():
         window_handle = cv2.namedWindow("CSI Camera", cv2.WINDOW_AUTOSIZE)
         # Window
@@ -122,7 +124,7 @@ def detect():
                     [(xmin,ymin),(xmax,ymax)] = obj['bbox']
                     color = colors[names.index(label)]
                     #gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
-                    coords = pred[0][:, :4]
+                    coords = torch.tensor([pred[0][:, :4][objs.index(obj)].tolist()])
                     coords = scale_coords(img.shape, coords, im0.shape).round()
                     plot_one_box(coords.tolist()[0], im0, label=label, color=color, line_thickness=1)
                     #im0 = cv2.rectangle(im0, (xmin,ymin), (xmax,ymax), color, 2) 
