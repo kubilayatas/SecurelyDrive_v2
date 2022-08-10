@@ -4,6 +4,10 @@ import torch
 import random
 import torchvision.transforms as transforms
 import numpy as np
+import threading
+from playsound import playsound
+SoundWarnFlag = False
+conveyor = []
 
 
 from elements.yolo import OBJ_DETECTION
@@ -40,6 +44,24 @@ def gstreamer_pipeline(
             display_height,
         )
     )
+
+def Warn_Conveyor(warnType,person):
+    sound_file = "./wav/" + warnType + " - " + person + ".wav"
+    return sound_file
+
+def play_conveyor(conveyor):
+    global SoundWarnFlag
+    if not SoundWarnFlag:
+        SoundWarnFlag = True
+        for sound in conveyor:
+            playsound(sound)
+        SoundWarnFlag = False
+
+def Start_Warn(conv):
+    global conveyor
+    t1 = threading.Thread(target = play_conveyor, args = ([conv]), daemon = True)
+    t1.start()
+    conveyor = []
 
 def equalize_image(img,method = 'HE'):
     img_yuv = cv2.cvtColor(img, cv2.COLOR_BGR2YUV)
@@ -117,6 +139,7 @@ def detect():
                 LstmDetFlag = True
                 looking = ""
                 # plotting
+                conveyor = []
                 for obj in objs:
                     # print(obj)
                     label = obj['label']
@@ -152,7 +175,12 @@ def detect():
                     im0 = cv2.putText(im0, "   Smoking: " + ("True" if Smoking else "False"), (txt_wid*1, txt_height), 0, text_scale, ([0, 0, 225] if Smoking else [225, 0, 0]), thickness=1, lineType=cv2.LINE_AA)
                     im0 = cv2.putText(im0, "   Texting: " + ("True" if Texting else "False"), (txt_wid*2, txt_height), 0, text_scale, ([0, 0, 225] if Texting else [225, 0, 0]), thickness=1, lineType=cv2.LINE_AA)
                     im0 = cv2.putText(im0, "   Looking: " + (looking),                          (txt_wid*3, txt_height), 0, text_scale, ([0, 0, 225] if looking=="other" else [225, 0, 0]), thickness=1, lineType=cv2.LINE_AA)
+                    if PhoneCall: conveyor.append(Warn_Conveyor("PhoneCall","Fatma"))
+                    if Smoking: conveyor.append(Warn_Conveyor("Cigarette","Fatma"))
+                    if Texting: conveyor.append(Warn_Conveyor("Texting","Fatma"))
 
+            
+            Start_Warn(conveyor)
             cv2.imshow("CSI Camera", im0)
             keyCode = cv2.waitKey(30)
             if keyCode == ord('q'):
