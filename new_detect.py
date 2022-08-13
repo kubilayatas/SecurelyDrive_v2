@@ -14,10 +14,12 @@ SoundWarnFlag = False
 PhoneWarnFlag = False
 CigaretteWarnFlag = False
 TextingWarnFlag = False
+DistractionWarnFlag = False
 
 PhoneWarnCounter = 0
 CigaretteWarnCounter = 0
 TextingWarnCounter = 0
+DistractionWarnCounter = 0
 
 PhoneWarnCounter2 = 0
 CigaretteWarnCounter2 = 0
@@ -127,6 +129,14 @@ def TextingWarnFlagToggle(t):
         Start_Warn([Warn_Conveyor("TextingWarn", Person)])
     time.sleep(30)
     TextingWarnFlag = False
+
+def DistractionWarnFlagToggle(t):
+    global DistractionWarnFlag
+    global DistractionWarnCounter
+    DistractionWarnCounter +=1
+    #Start_Warn([Warn_Conveyor("DistractionLevel", Person)])
+    time.sleep(30)
+    DistractionWarnFlag = False
         
 ###############################
 def dweet(variable):
@@ -200,6 +210,7 @@ def detect():
     global PhoneWarnFlag
     global CigaretteWarnFlag
     global TextingWarnFlag
+    global DistractionWarnFlag
     
     
     
@@ -230,6 +241,7 @@ def detect():
                 phn_trd = threading.Thread(target = PhoneWarnFlagToggle, args = [time.time()],daemon=True)
                 cgr_trd = threading.Thread(target = CigaretteWarnFlagToggle, args = [time.time()],daemon=True)
                 tx_trd = threading.Thread(target = TextingWarnFlagToggle, args = [time.time()],daemon=True)
+                dist_trd = threading.Thread(target = DistractionWarnFlagToggle, args = [time.time()],daemon=True)
                 value_conveyor = []
                 for obj in objs:
                     # print(obj)
@@ -285,6 +297,11 @@ def detect():
                         conveyor.append(Warn_Conveyor("Texting", Person))
                         TextingWarnFlag = True
                         tx_trd.start()
+                    if distractionLevel.item()*100 > 40.0 and not DistractionWarnFlag:
+                        conveyor.append(Warn_Conveyor("DistractionLevel", Person))
+                        DistractionWarnFlag = True
+                        dist_trd.start()
+                    
 
             
             if conveyor != []: Start_Warn(conveyor)
@@ -296,6 +313,8 @@ def detect():
             value_conveyor.append("PhoneWarnCounter2={}".format(PhoneWarnCounter2))
             value_conveyor.append("CigaretteWarnCounter2={}".format(CigaretteWarnCounter2))
             value_conveyor.append("TextingWarnCounter2={}".format(TextingWarnCounter2))
+            value_conveyor.append("DistractionWarnCounter={}".format(DistractionWarnCounter))
+            
             threading.Thread(target = dweet, args = [value_conveyor], daemon = True).start()
             FPS = int(1/(time.time()-time1))
             im0 = cv2.putText(im0, "FPS: {}".format(FPS),(0, txt_height*2), 0, text_scale,[0, 0, 255], thickness=1, lineType=cv2.LINE_AA)
