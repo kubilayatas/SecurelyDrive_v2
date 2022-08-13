@@ -5,14 +5,43 @@ import random
 import torchvision.transforms as transforms
 import numpy as np
 import threading
+import time
+import requests
 from playsound import playsound
+
 SoundWarnFlag = False
+
+PhoneWarnFlag = False
+CigaretteWarnFlag = False
+TextingWarnFlag = False
+
+PhoneWarnCounter = 0
+CigaretteWarnCounter = 0
+TextingWarnCounter = 0
+
+PhoneWarnCounter2 = 0
+CigaretteWarnCounter2 = 0
+TextingWarnCounter2 = 0
+
+Person = "Fatma"
+FPS = 0
+
+distractionLevel = 0
+distLevPHN = 0.3
+distLevCIG = 0.2
+distLevTEX = 0.3
+distLevLKG = 0.2
+
 conveyor = []
+value_conveyor = []
+
 
 
 from elements.yolo import OBJ_DETECTION
 from elements.Look_classifier import Look_Classifier
 from elements.Lstm_decision import Lstm_decision
+
+
 from models.experimental import attempt_load
 from utils.torch_utils import select_device
 from utils.general import scale_coords
@@ -62,7 +91,55 @@ def Start_Warn(conv):
     t1 = threading.Thread(target = play_conveyor, args = ([conv]), daemon = True)
     t1.start()
     conveyor = []
+###############################
+def PhoneWarnFlagToggle(t):
+    global PhoneWarnFlag
+    global PhoneWarnCounter
+    global PhoneWarnCounter2
+    PhoneWarnCounter +=1
+    if PhoneWarnCounter > 3:
+        PhoneWarnCounter = 0
+        PhoneWarnCounter2 += 1
+        Start_Warn([Warn_Conveyor("PhoneCallWarn", Person)])
+    time.sleep(30)
+    PhoneWarnFlag = False
 
+def CigaretteWarnFlagToggle(t):
+    global CigaretteWarnFlag
+    global CigaretteWarnCounter
+    global CigaretteWarnCounter2
+    CigaretteWarnCounter +=1
+    if CigaretteWarnCounter > 3:
+        CigaretteWarnCounter = 0
+        CigaretteWarnCounter2 += 1
+        Start_Warn([Warn_Conveyor("CigaretteWarn",Person)])
+    time.sleep(30)
+    CigaretteWarnFlag = False
+
+def TextingWarnFlagToggle(t):
+    global TextingWarnFlag
+    global TextingWarnCounter
+    global TextingWarnCounter2
+    TextingWarnCounter +=1
+    if TextingWarnCounter > 3:
+        TextingWarnCounter = 0
+        TextingWarnCounter2 += 1
+        Start_Warn([Warn_Conveyor("TextingWarn", Person)])
+    time.sleep(30)
+    TextingWarnFlag = False
+        
+###############################
+def dweet(variable):
+    url = "https://dweet.io/dweet/for/"
+    url += "DistLev"
+    url += "?"
+    url += "&".join(variable)
+    try:
+        #requests.get(url = url)
+        requests.post(url=url)
+    except:
+        print("Hata: Dweet gönderilemedi! İnternet bağlantısını kontrol ediniz.")
+###############################
 def equalize_image(img,method = 'HE'):
     img_yuv = cv2.cvtColor(img, cv2.COLOR_BGR2YUV)
     if method == 'HE':
@@ -110,6 +187,7 @@ def detect():
     
     Object_detector = OBJ_DETECTION(opt.DetectorWeights, opt.device, opt.img_size)
     
+    
     if opt.drv_gaze:
         Gaze_Detector = Look_Classifier(opt.DriverGazeWeights, "resnet50", opt.deviceGAZE)
     if opt.lstm_detect:
@@ -119,6 +197,12 @@ def detect():
     names = Object_detector.classes
     colors = [[random.randint(0, 255) for _ in range(3)] for _ in names]
     
+    global PhoneWarnFlag
+    global CigaretteWarnFlag
+    global TextingWarnFlag
+    
+    
+    
     if opt.source == 0:
         cap = cv2.VideoCapture(0)
     else:
@@ -127,12 +211,15 @@ def detect():
     #img = torch.zeros((1, 3, imgsz, imgsz))
     im0 = []
     if cap.isOpened():
+        global distractionLevel
         window_handle = cv2.namedWindow("CSI Camera", cv2.WINDOW_AUTOSIZE)
         # Window
         while cv2.getWindowProperty("CSI Camera", 0) >= 0:
+            time1 = time.time()
             ret, frame = cap.read()
             img = letterbox(frame, new_shape=opt.img_size)[0]
             im0 = frame.copy()
+            distractionLevel = 0.0
             if ret:
                 # detection process
                 objs,pred= Object_detector.detect(img)
@@ -140,6 +227,10 @@ def detect():
                 looking = ""
                 # plotting
                 conveyor = []
+                phn_trd = threading.Thread(target = PhoneWarnFlagToggle, args = [time.time()],daemon=True)
+                cgr_trd = threading.Thread(target = CigaretteWarnFlagToggle, args = [time.time()],daemon=True)
+                tx_trd = threading.Thread(target = TextingWarnFlagToggle, args = [time.time()],daemon=True)
+                value_conveyor = []
                 for obj in objs:
                     # print(obj)
                     label = obj['label']
@@ -161,7 +252,11 @@ def detect():
                     LstmDetFlag = False
                     lstm_dat = LSTM_detector.elestiem(pred,names,frame.shape,img.shape)
                     lstm_dat.append(1.0 if looking=="forward" else 0.0)
-                    lstm_o = LSTM_detector.lstm_det(lstm_dat)
+                    lstm_o,lstm_output = LSTM_detector.lstm_det(lstm_dat)
+                    distractionLevel += lstm_output[0]*distLevPHN
+                    distractionLevel += lstm_output[1]*distLevCIG
+                    distractionLevel += lstm_output[2]*distLevTEX
+                    distractionLevel += (1.0 if looking=="forward" else 0.0)*distLevLKG
                     lab = ''.join([str(elem) for elem in lstm_o])
                     PhoneCall = bool(int(lstm_o[0]))
                     Smoking = bool(int(lstm_o[1]))
@@ -175,12 +270,35 @@ def detect():
                     im0 = cv2.putText(im0, "   Smoking: " + ("True" if Smoking else "False"), (txt_wid*1, txt_height), 0, text_scale, ([0, 0, 225] if Smoking else [225, 0, 0]), thickness=1, lineType=cv2.LINE_AA)
                     im0 = cv2.putText(im0, "   Texting: " + ("True" if Texting else "False"), (txt_wid*2, txt_height), 0, text_scale, ([0, 0, 225] if Texting else [225, 0, 0]), thickness=1, lineType=cv2.LINE_AA)
                     im0 = cv2.putText(im0, "   Looking: " + (looking),                          (txt_wid*3, txt_height), 0, text_scale, ([0, 0, 225] if looking=="other" else [225, 0, 0]), thickness=1, lineType=cv2.LINE_AA)
-                    if PhoneCall: conveyor.append(Warn_Conveyor("PhoneCall","Fatma"))
-                    if Smoking: conveyor.append(Warn_Conveyor("Cigarette","Fatma"))
-                    if Texting: conveyor.append(Warn_Conveyor("Texting","Fatma"))
+                    value_conveyor.append("PhnCall" + ("=1" if PhoneCall else "=0"))
+                    value_conveyor.append("Smk" + ("=1" if Smoking else "=0"))
+                    value_conveyor.append("Txt" + ("=1" if Texting else "=0"))
+                    if PhoneCall and not PhoneWarnFlag:
+                        conveyor.append(Warn_Conveyor("PhoneCall", Person))
+                        PhoneWarnFlag = True
+                        phn_trd.start()
+                    if Smoking and not CigaretteWarnFlag:
+                        conveyor.append(Warn_Conveyor("Cigarette", Person))
+                        CigaretteWarnFlag = True
+                        cgr_trd.start()
+                    if Texting and not TextingWarnFlag:
+                        conveyor.append(Warn_Conveyor("Texting", Person))
+                        TextingWarnFlag = True
+                        tx_trd.start()
 
             
-            Start_Warn(conveyor)
+            if conveyor != []: Start_Warn(conveyor)
+            im0 = cv2.putText(im0, "Distraction: % {:.2f}".format(distractionLevel.item()*100),(0, txt_height*3), 0, text_scale,[0, 0, 255], thickness=1, lineType=cv2.LINE_AA)
+            value_conveyor.append("DistractionLevel={:.2f}".format(distractionLevel.item()*100))
+            value_conveyor.append("PhoneWarnCounter={}".format(PhoneWarnCounter))
+            value_conveyor.append("CigaretteWarnCounter={}".format(CigaretteWarnCounter))
+            value_conveyor.append("TextingWarnCounter={}".format(TextingWarnCounter))
+            value_conveyor.append("PhoneWarnCounter2={}".format(PhoneWarnCounter2))
+            value_conveyor.append("CigaretteWarnCounter2={}".format(CigaretteWarnCounter2))
+            value_conveyor.append("TextingWarnCounter2={}".format(TextingWarnCounter2))
+            threading.Thread(target = dweet, args = [value_conveyor], daemon = True).start()
+            FPS = int(1/(time.time()-time1))
+            im0 = cv2.putText(im0, "FPS: {}".format(FPS),(0, txt_height*2), 0, text_scale,[0, 0, 255], thickness=1, lineType=cv2.LINE_AA)
             cv2.imshow("CSI Camera", im0)
             keyCode = cv2.waitKey(30)
             if keyCode == ord('q'):

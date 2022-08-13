@@ -115,4 +115,4 @@ class Lstm_decision():
         #top_n, top_i = output.topk(1)
         output = torch.tensor([min(1.0,max(0.0,elem.item())) for elem in output[0]]).to(select_device('cpu'))
         o = [(1 if elem.item()>=0.5 else 0) for elem in output]
-        return o
+        return o,output
