@@ -25,6 +25,8 @@ PhoneWarnCounter2 = 0
 CigaretteWarnCounter2 = 0
 TextingWarnCounter2 = 0
 
+PhoneNumber = "05356771065"
+
 Person = "Fatma"
 FPS = 0
 
@@ -42,6 +44,9 @@ value_conveyor = []
 from elements.yolo import OBJ_DETECTION
 from elements.Look_classifier import Look_Classifier
 from elements.Lstm_decision import Lstm_decision
+from elements.zte_modem_api import zte_modem
+
+zte_modem = zte_modem("192.168.0.1","admin")
 
 
 from models.experimental import attempt_load
@@ -103,6 +108,9 @@ def PhoneWarnFlagToggle(t):
         PhoneWarnCounter = 0
         PhoneWarnCounter2 += 1
         Start_Warn([Warn_Conveyor("PhoneCallWarn", Person)])
+        if PhoneWarnCounter2 > 1:
+            PhoneWarnCounter2 = 0
+            send_sms(PhoneNumber,"01**29* plakali aracin surucusu, arac kullanirken telefon gorusmesi yapmaktadir.")
     time.sleep(30)
     PhoneWarnFlag = False
 
@@ -115,6 +123,9 @@ def CigaretteWarnFlagToggle(t):
         CigaretteWarnCounter = 0
         CigaretteWarnCounter2 += 1
         Start_Warn([Warn_Conveyor("CigaretteWarn",Person)])
+        if CigaretteWarnCounter2 > 1:
+            CigaretteWarnCounter2 = 0
+            send_sms(PhoneNumber,"01**29* plakali aracin surucusu, direksiyon basinda sigara kullanmaktadir.")
     time.sleep(30)
     CigaretteWarnFlag = False
 
@@ -127,6 +138,9 @@ def TextingWarnFlagToggle(t):
         TextingWarnCounter = 0
         TextingWarnCounter2 += 1
         Start_Warn([Warn_Conveyor("TextingWarn", Person)])
+        if TextingWarnCounter2 > 1:
+            TextingWarnCounter2 = 0
+            send_sms(PhoneNumber,"01**29* plakali aracin surucusu, arac kullanirken cep telefonu ile mesajlasmaktadir.")
     time.sleep(30)
     TextingWarnFlag = False
 
@@ -135,6 +149,8 @@ def DistractionWarnFlagToggle(t):
     global DistractionWarnCounter
     DistractionWarnCounter +=1
     #Start_Warn([Warn_Conveyor("DistractionLevel", Person)])
+    if DistractionWarnCounter % 2 == 1:
+        send_sms(PhoneNumber,"01**29* plakali aracin surucusunun dikkat daginikligi seviyesi cok yuksek!")
     time.sleep(30)
     DistractionWarnFlag = False
         
@@ -149,6 +165,13 @@ def dweet(variable):
         requests.post(url=url)
     except:
         print("Hata: Dweet gönderilemedi! İnternet bağlantısını kontrol ediniz.")
+###############################
+def zte_sms(number,message):
+    zte_modem.send_sms("{}".format(number), "{}".format(message))
+
+def send_sms(number,message):
+    threading.Thread(target = zte_sms, args=(number,message), daemon = True).start()
+
 ###############################
 def equalize_image(img,method = 'HE'):
     img_yuv = cv2.cvtColor(img, cv2.COLOR_BGR2YUV)
@@ -223,7 +246,7 @@ def detect():
     im0 = []
     if cap.isOpened():
         global distractionLevel
-        window_handle = cv2.namedWindow("CSI Camera", cv2.WINDOW_AUTOSIZE)
+        window_handle = cv2.namedWindow("CSI Camera", cv2.WINDOW_AUTOSIZE) #cv2.WINDOW_AUTOSIZE
         # Window
         while cv2.getWindowProperty("CSI Camera", 0) >= 0:
             time1 = time.time()
