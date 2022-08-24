@@ -7,6 +7,7 @@ import numpy as np
 import threading
 import time
 import requests
+import os
 from playsound import playsound
 
 SoundWarnFlag = False
@@ -25,7 +26,7 @@ PhoneWarnCounter2 = 0
 CigaretteWarnCounter2 = 0
 TextingWarnCounter2 = 0
 
-PhoneNumber = "05356771065"
+PhoneNumber = "05*********"
 
 Person = "Fatma"
 FPS = 0
@@ -40,13 +41,10 @@ conveyor = []
 value_conveyor = []
 
 
-
 from elements.yolo import OBJ_DETECTION
 from elements.Look_classifier import Look_Classifier
 from elements.Lstm_decision import Lstm_decision
 from elements.zte_modem_api import zte_modem
-
-zte_modem = zte_modem("192.168.0.1","admin")
 
 
 from models.experimental import attempt_load
@@ -170,7 +168,8 @@ def zte_sms(number,message):
     zte_modem.send_sms("{}".format(number), "{}".format(message))
 
 def send_sms(number,message):
-    threading.Thread(target = zte_sms, args=(number,message), daemon = True).start()
+    if zte_modem is not None:
+        threading.Thread(target = zte_sms, args=(number,message), daemon = True).start()
 
 ###############################
 def equalize_image(img,method = 'HE'):
@@ -244,6 +243,7 @@ def detect():
         cap = cv2.VideoCapture(opt.source, cv2.CAP_GSTREAMER)
     #img = torch.zeros((1, 3, imgsz, imgsz))
     im0 = []
+    capture_count = 0
     if cap.isOpened():
         global distractionLevel
         window_handle = cv2.namedWindow("CSI Camera", cv2.WINDOW_AUTOSIZE) #cv2.WINDOW_AUTOSIZE
@@ -341,6 +341,8 @@ def detect():
             threading.Thread(target = dweet, args = [value_conveyor], daemon = True).start()
             FPS = int(1/(time.time()-time1))
             im0 = cv2.putText(im0, "FPS: {}".format(FPS),(0, txt_height*2), 0, text_scale,[0, 0, 255], thickness=1, lineType=cv2.LINE_AA)
+            cv2.imwrite("./" + project_path + "/{:05d}".format(capture_count) + ".jpg",im0)
+            capture_count += 1
             cv2.imshow("CSI Camera", im0)
             keyCode = cv2.waitKey(30)
             if keyCode == ord('q'):
@@ -375,9 +377,23 @@ if __name__ == '__main__':
     parser.add_argument('--name', default='exp', help='save results to project/name')
     parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
     parser.add_argument('--drv-gaze', action='store_true', help='existing project/name ok, do not increment')
+    parser.add_argument('--zte-device', action='store_true', help='existing project/name ok, do not increment')
     opt = parser.parse_args()
     print(opt)
+    global project_path
+    count = 0
+    project_path = "./" + opt.project + "/" + opt.name
+    if os.path.exists(project_path):
+        while os.path.exists(project_path + str(count)):
+            count += 1
+        project_path = "./" + opt.project + "/" + opt.name + str(count)
+    else:
+        project_path = "./" + opt.project + "/" + opt.name
+    os.makedirs(project_path)
     
+        
+    if opt.zte_device:
+        zte_modem = zte_modem("192.168.0.1","admin")
     if opt.source == "csicam":
         opt.source = gstreamer_pipeline(
             capture_width=3264,
