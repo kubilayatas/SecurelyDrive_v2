@@ -338,7 +338,7 @@ def detect():
             value_conveyor.append("TextingWarnCounter2={}".format(TextingWarnCounter2))
             value_conveyor.append("DistractionWarnCounter={}".format(DistractionWarnCounter))
             
-            threading.Thread(target = dweet, args = [value_conveyor], daemon = True).start()
+            if dweeting: threading.Thread(target = dweet, args = [value_conveyor], daemon = True).start()
             FPS = int(1/(time.time()-time1))
             im0 = cv2.putText(im0, "FPS: {}".format(FPS),(0, txt_height*2), 0, text_scale,[0, 0, 255], thickness=1, lineType=cv2.LINE_AA)
             cv2.imwrite("./" + project_path + "/{:05d}".format(capture_count) + ".jpg",im0)
@@ -378,9 +378,12 @@ if __name__ == '__main__':
     parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
     parser.add_argument('--drv-gaze', action='store_true', help='existing project/name ok, do not increment')
     parser.add_argument('--zte-device', action='store_true', help='existing project/name ok, do not increment')
+    parser.add_argument('--dweeting', action='store_true', help='existing project/name ok, do not increment')
     opt = parser.parse_args()
     print(opt)
     global project_path
+    global dweeting
+    dweeting = opt.dweeting
     count = 0
     project_path = "./" + opt.project + "/" + opt.name
     if os.path.exists(project_path):
